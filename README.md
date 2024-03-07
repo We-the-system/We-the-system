@@ -2,7 +2,7 @@
 
 This repository is made for the project of the Microprocessor Application System Project.
 
-In this project we're using hiwonder ackerman steering.
+In this project we're using hiwonder ackerman steering with Arduino MEGA.
 
 We'll be doing Regenerative System, PID Control, Wireless Communication, Vehicle Mapping.
 
