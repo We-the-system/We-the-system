@@ -1,0 +1,137 @@
+#define ENC_COUNT_REV 330 //
+
+#define encoderPinA 18 // Yellow
+#define encoderPinB 19 // White
+
+int motor1pin1 = 2;
+int motor1pin2 = 3;
+
+int motor2pin1 = 4;
+int motor2pin2 = 5;
+
+volatile int EncoderCount = 0; // discrete
+
+///여기부터 시험
+long right_wheel_pulse_count = 0; /////////////확인하기 !!!!!!!!!!!!!!!!!!!!!!!
+ 
+// One-second interval for measurements
+int timeinterval = 1000; //output time interval
+// Counters for milliseconds during interval
+double previousMillis = 0;
+double currentMillis = 0;
+ // Variable for RPM measuerment
+float rpm_right = 0;
+ 
+// Variable for angular velocity measurement
+float ang_velocity_right = 0;
+float ang_velocity_right_deg = 0;
+const float rpm_to_radians = 0.10471975512;
+const float rad_to_deg = 57.29578;
+
+
+//pid testing
+//PID VALUE
+
+double dt;
+
+void EncoderPositionRead();
+void right_wheel_pulse();
+
+
+
+
+
+
+void setup() {
+  // put your setup code here, to run once:
+
+  pinMode(motor1pin1, OUTPUT);
+  pinMode(motor1pin2, OUTPUT);
+  pinMode(motor2pin1,  OUTPUT);
+  pinMode(motor2pin2, OUTPUT);
+
+  //(Optional)
+  pinMode(9,  OUTPUT); 
+  pinMode(10, OUTPUT);
+  //(Optional)
+  Serial.begin(9600);
+  pinMode(encoderPinA, INPUT);
+  pinMode(encoderPinB, INPUT);
+  
+  attachInterrupt(digitalPinToInterrupt(encoderPinA),EncoderPositionRead, RISING);
+
+  EncoderCount = 0;
+}
+
+
+void loop() {
+  // put your main code here, to run repeatedly:
+
+  //Controlling speed (0  = off and 255 = max speed):     
+  //(Optional)
+  analogWrite(9, 100); //ENA  pin
+  analogWrite(10, 200); //ENB pin
+  digitalWrite(motor1pin1,  HIGH);
+  digitalWrite(motor1pin2, LOW);
+
+
+  
+
+
+  // Record the time
+  currentMillis = millis();
+  
+ 
+  // If one second has passed, print the number of pulses
+  float timedifference = currentMillis - previousMillis;
+  if (timedifference > timeinterval) {
+
+    previousMillis = currentMillis;
+    
+
+
+
+    // Calculate revolutions per minute
+    rpm_right = (float)(EncoderCount * 60 / ENC_COUNT_REV);
+    ang_velocity_right = rpm_right * rpm_to_radians;   
+    ang_velocity_right_deg = ang_velocity_right * rad_to_deg;
+     
+    Serial.print(" Pulses: ");
+    Serial.println(right_wheel_pulse_count);
+    Serial.print(" Speed: ");
+    Serial.print(rpm_right);
+    Serial.println(" RPM");
+    Serial.print(" Angular Velocity: ");
+    Serial.print(rpm_right);
+    Serial.print(" rad per second");
+    Serial.print("\t");
+    Serial.println(ang_velocity_right_deg);
+  
+    Serial.println(" deg per second");
+    Serial.print(EncoderCount);
+    Serial.println();
+ 
+    EncoderCount = 0;
+  }
+}
+
+
+void EncoderPositionRead() {
+  if (digitalRead(encoderPinA) == digitalRead(encoderPinB)) {
+    EncoderCount++;
+  } else {
+    EncoderCount--;
+  }
+}
+
+
+// double pidcontrol(double error)
+// {
+//   double proportioanl = error;
+//   integral += error *dt;
+//   double derivative = (error - previous) / dt;
+//   previous = error;
+//   double output = (kp * proportioanl) + (ki * integral) + (kd* derivative);
+//   return output;
+// }
+
