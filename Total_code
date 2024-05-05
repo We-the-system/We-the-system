@@ -8,5 +8,96 @@
 #define Motor_L_pin2 3 //left motor 
 
 //Right Motor
+#define Encoder_R_PulseA 20 // Yellow
+#define Encoder_R_PulseB 21 // White
 #define motor2pin1 4 
 #define motor2pin2 5 //right motor
+#define ENA 10 //right velocity
+
+//global variable to control encodercount
+volatile long EncoderCount = 0; //per one rotation
+
+int timeinterval = 1000; //output time interval
+// Counters for milliseconds during interval
+long previousMillis = 0;
+long currentMillis = 0;
+ // Variable for RPM measuerment
+float rpm_right = 0;
+ 
+// Variable for angular velocity measurement
+float ang_velocity_right = 0;
+float ang_velocity_right_deg = 0;
+const float rpm_to_radians = 0.10471975512;
+const float rad_to_deg = 57.29578;
+const float wheel_diameter = 0.067;
+
+void setup() {
+  Serial.begin(9600);
+  //left motor pinmode
+  pinMode(Motor_L_pin1, OUTPUT);
+  pinMode(Motor_L_pin2, OUTPUT);
+  pinMode(ENA,  OUTPUT);
+  pinMode(Encoder_L_PulseA, INPUT_PULLUP);
+  pinMode(Encoder_L_PulseB, INPUT_PULLUP);
+
+  //right motor pinmode
+  pinMode(Motor_L_pin1, OUTPUT);
+  pinMode(Motor_L_pin2, OUTPUT);
+  pinMode(ENA,  OUTPUT);
+  pinMode(Encoder_L_PulseA, INPUT_PULLUP);
+  pinMode(Encoder_L_PulseB, INPUT_PULLUP);
+  delay(5000); // delay 5 seconds to run
+  attachInterrupt(digitalPinToInterrupt(Encoder_L_PulseA),EncoderPositionRead, RISING);
+
+  digitalWrite(Motor_L_pin1, HIGH);
+  digitalWrite(Motor_L_pin2, LOW); //확인해보기 앞 뒤 주행
+  analogWrite(ENA, 255);
+
+
+}
+
+void loop() {
+  SerialPrint();
+  EncoderCount = 0;//initalize 
+  
+}
+
+//반시계 방향이 정방향일 때 (Left Motor 기준)
+void EncoderPositionRead() {
+  if (digitalRead(Encoder_L_PulseA) == digitalRead(Encoder_L_PulseB)) {
+    EncoderCount++;
+  } 
+  else {
+    EncoderCount--;
+  }
+}
+
+void SerialPrint(){
+  // Record the time
+  currentMillis = millis();
+ 
+  // If one second has passed, print the number of pulses
+  float timedifference = currentMillis - previousMillis;
+  //if (timedifference > timeinterval) {
+  previousMillis = currentMillis;
+    // Calculate revolutions per minute
+  rpm_right = (float)(EncoderCount * 60 / ENC_COUNT_REV);
+  ang_velocity_right = rpm_right * rpm_to_radians;   
+  ang_velocity_right_deg = ang_velocity_right * rad_to_deg;
+  float wheel_speed = ang_velocity_right * wheel_diameter / 2;
+  Serial.print(" Speed: ");
+  Serial.print(wheel_speed);
+  Serial.println("m/s");
+    // Serial.print(rpm_right);
+    // Serial.println(" RPM");
+    // Serial.print(" Angular Velocity: ");
+    // Serial.print(rpm_right);
+    // Serial.print(" rad per second");
+    // Serial.print("\t");
+    // Serial.println(ang_velocity_right_deg);
+  
+    // Serial.print(" deg per second");
+    // Serial.println();
+  Serial.print(EncoderCount);
+  Serial.println();
+}
