@@ -1,10 +1,12 @@
-//git bash test
+#define ENC_COUNT_REV 330 //pulse per 1 rotation(360degree)
 
-//git dddddd
+//Left Motor
+#define Encoder_L_PulseA 18 // Yellow
+#define Encoder_L_PulseB 19 // White
+#define ENA 9 //left velocity
+#define Motor_L_pin1 2
+#define Motor_L_pin2 3 //left motor 
 
-//git test
-void setup(){
-}
-void loop(){
-}
-//total change
+//Right Motor
+#define motor2pin1 4 
+#define motor2pin2 5 //right motor
