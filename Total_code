@@ -1,103 +1,98 @@
 #define ENC_COUNT_REV 330 //pulse per 1 rotation(360degree)
+#define WHEEL_RADIUS 0.067
 
 //Left Motor
 #define Encoder_L_PulseA 18 // Yellow
 #define Encoder_L_PulseB 19 // White
-#define ENA 9 //left velocity
+#define EN_L 9 //left velocity
 #define Motor_L_pin1 2
 #define Motor_L_pin2 3 //left motor 
 
 //Right Motor
 #define Encoder_R_PulseA 20 // Yellow
 #define Encoder_R_PulseB 21 // White
-#define motor2pin1 4 
-#define motor2pin2 5 //right motor
-#define ENA 10 //right velocity
+#define Motor_R_pin1 4 
+#define Motor_R_pin2 5 //right motor
+#define EN_R 10 //right velocity
 
-//global variable to control encodercount
-volatile long EncoderCount = 0; //per one rotation
+#define pwm_L 255
 
-int timeinterval = 1000; //output time interval
-// Counters for milliseconds during interval
-long previousMillis = 0;
-long currentMillis = 0;
- // Variable for RPM measuerment
-float rpm_right = 0;
- 
-// Variable for angular velocity measurement
-float ang_velocity_right = 0;
-float ang_velocity_right_deg = 0;
-const float rpm_to_radians = 0.10471975512;
-const float rad_to_deg = 57.29578;
-const float wheel_diameter = 0.067;
+volatile int EncoderCount_L = 0; //per one rotation
+float kp, kd, ki;
+double integral = 0.0;
+long preT = 0;
+double error=0.0;
+double pre_error=0.0;
 
 void setup() {
   Serial.begin(9600);
   //left motor pinmode
   pinMode(Motor_L_pin1, OUTPUT);
   pinMode(Motor_L_pin2, OUTPUT);
-  pinMode(ENA,  OUTPUT);
-  pinMode(Encoder_L_PulseA, INPUT_PULLUP);
-  pinMode(Encoder_L_PulseB, INPUT_PULLUP);
+  pinMode(EN_L,  OUTPUT);
+  pinMode(Encoder_L_PulseA, INPUT);
+  pinMode(Encoder_L_PulseB, INPUT);
 
   //right motor pinmode
-  pinMode(Motor_L_pin1, OUTPUT);
-  pinMode(Motor_L_pin2, OUTPUT);
-  pinMode(ENA,  OUTPUT);
-  pinMode(Encoder_L_PulseA, INPUT_PULLUP);
-  pinMode(Encoder_L_PulseB, INPUT_PULLUP);
+  pinMode(Motor_R_pin1, OUTPUT);
+  pinMode(Motor_R_pin2, OUTPUT);
+  pinMode(EN_R,  OUTPUT);
+  pinMode(Encoder_R_PulseA, INPUT_PULLUP);
+  pinMode(Encoder_R_PulseB, INPUT_PULLUP);
   delay(5000); // delay 5 seconds to run
+
   attachInterrupt(digitalPinToInterrupt(Encoder_L_PulseA),EncoderPositionRead, RISING);
 
   digitalWrite(Motor_L_pin1, HIGH);
   digitalWrite(Motor_L_pin2, LOW); //확인해보기 앞 뒤 주행
-  analogWrite(ENA, 255);
+  analogWrite(EN_L, pwm_L);
+  PID_gain();
 
 
 }
 
 void loop() {
-  SerialPrint();
-  EncoderCount = 0;//initalize 
-  
+  long nowT = micros();
+  double dt = ((double)(nowT - preT)/1.0e6);
+  float velocity_L = Convert_CtoV(EncoderCount_L, dt);
+
+  //pid
+  pid(error, dt);
+
+  //for next loop
+  EncoderCount_L = 0;
+  preT = nowT;
 }
 
 //반시계 방향이 정방향일 때 (Left Motor 기준)
 void EncoderPositionRead() {
   if (digitalRead(Encoder_L_PulseA) == digitalRead(Encoder_L_PulseB)) {
-    EncoderCount++;
+    EncoderCount_L++;
   } 
   else {
-    EncoderCount--;
+    EncoderCount_L--;
   }
 }
 
-void SerialPrint(){
-  // Record the time
-  currentMillis = millis();
- 
-  // If one second has passed, print the number of pulses
-  float timedifference = currentMillis - previousMillis;
-  //if (timedifference > timeinterval) {
-  previousMillis = currentMillis;
-    // Calculate revolutions per minute
-  rpm_right = (float)(EncoderCount * 60 / ENC_COUNT_REV);
-  ang_velocity_right = rpm_right * rpm_to_radians;   
-  ang_velocity_right_deg = ang_velocity_right * rad_to_deg;
-  float wheel_speed = ang_velocity_right * wheel_diameter / 2;
-  Serial.print(" Speed: ");
-  Serial.print(wheel_speed);
-  Serial.println("m/s");
-    // Serial.print(rpm_right);
-    // Serial.println(" RPM");
-    // Serial.print(" Angular Velocity: ");
-    // Serial.print(rpm_right);
-    // Serial.print(" rad per second");
-    // Serial.print("\t");
-    // Serial.println(ang_velocity_right_deg);
-  
-    // Serial.print(" deg per second");
-    // Serial.println();
-  Serial.print(EncoderCount);
-  Serial.println();
+void PID_gain(){
+  kp = 0.8;
+  ki = 0.2;
+  kd = 0.1;
+}
+
+double pid(double error, double dt)
+{
+  double proportional = error;
+  integral = integral + error * dt;
+  double derivative = (error - pre_error) / dt;
+  pre_error = error;
+  double output = (kp * proportional) + (ki * integral) + (kd * derivative);
+  return output;
+}
+
+float Convert_CtoV(int count, double dt){
+  float rpm = (float)(count * 60.0 / ENC_COUNT_REV /dt);
+  float circumference = 2 * 3.141592 * WHEEL_RADIUS;
+  float velocity = rpm / 60.0 * circumference;
+  return velocity;
 }
