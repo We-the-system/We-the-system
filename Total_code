@@ -21,16 +21,12 @@
 #define MPU6050_ADDRESS 0x68
 #define ACCEL_XOUT_H 0x3B
 #define GYRO_XOUT_H 0x43
-
 // MPU6050의 스케일 팩터 설정
 const float ACCEL_SCALE = 16384.0; // 16384 LSB/g
 const float GYRO_SCALE = 131.0;    // 131 LSB/(º/s)
-
 const float dt_ = 0.01;
-
 float accel_x, accel_y, accel_z;
 float gyro_x, gyro_y, gyro_z;
-
 float velocity_x = 0.0;
 float velocity_y = 0.0;
 float displacement_x = 0.0;
