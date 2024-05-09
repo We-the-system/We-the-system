@@ -42,7 +42,7 @@ double error=0.0;
 double pre_error=0.0;
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   //left motor pinmode
   pinMode(Motor_L_pin1, OUTPUT);
   pinMode(Motor_L_pin2, OUTPUT);
