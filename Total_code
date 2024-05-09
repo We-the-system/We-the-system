@@ -17,6 +17,27 @@
 
 #define pwm_L 255
 
+//MPU sensor
+#define MPU6050_ADDRESS 0x68
+#define ACCEL_XOUT_H 0x3B
+#define GYRO_XOUT_H 0x43
+
+// MPU6050의 스케일 팩터 설정
+const float ACCEL_SCALE = 16384.0; // 16384 LSB/g
+const float GYRO_SCALE = 131.0;    // 131 LSB/(º/s)
+
+const float dt_ = 0.01;
+
+float accel_x, accel_y, accel_z;
+float gyro_x, gyro_y, gyro_z;
+
+float velocity_x = 0.0;
+float velocity_y = 0.0;
+float displacement_x = 0.0;
+float displacement_y = 0.0;
+float angleZ = 0.0;
+
+
 volatile int EncoderCount_L = 0; //per one rotation
 float kp, kd, ki;
 double integral = 0.0;
@@ -48,7 +69,7 @@ void setup() {
   analogWrite(EN_L, pwm_L);
   PID_gain();
 
-
+  writeRegister(MPU6050_ADDRESS, 0x6B, 0);
 }
 
 void loop() {
@@ -62,6 +83,8 @@ void loop() {
   //for next loop
   EncoderCount_L = 0;
   preT = nowT;
+
+  mpu();
 }
 
 //반시계 방향이 정방향일 때 (Left Motor 기준)
@@ -95,4 +118,83 @@ float Convert_CtoV(int count, double dt){
   float circumference = 2 * 3.141592 * WHEEL_RADIUS;
   float velocity = rpm / 60.0 * circumference;
   return velocity;
+}
+
+void mpu() {
+  readAccelData();
+  readGyroData();
+  
+  calculateDirection();
+  calculateDisplacement();
+
+  Serial.print(displacement_x);
+  Serial.print(" ");
+  Serial.print(displacement_y);
+  Serial.print(" ");
+  Serial.print(angleZ);
+  Serial.print(" ");
+
+  Serial.print(accel_x);
+  Serial.print(",");
+  Serial.print(accel_y);
+  Serial.print(",");
+  Serial.print(accel_z);
+  Serial.print(",");
+
+  Serial.print(gyro_x);
+  Serial.print(",");
+  Serial.print(gyro_y);
+  Serial.print(",");
+  Serial.println(gyro_z);
+
+  delay(10);
+}
+
+void writeRegister(uint8_t address, uint8_t reg, uint8_t data) {
+  Wire.beginTransmission(address);
+  Wire.write(reg);
+  Wire.write(data);
+  Wire.endTransmission();
+}
+
+void readRegisters(uint8_t address, uint8_t reg, uint8_t count, uint8_t* dest) {
+  Wire.beginTransmission(address);
+  Wire.write(reg);
+  Wire.endTransmission(false);
+  Wire.requestFrom(address, count, true);
+  for (int i = 0; i < count; i++) {
+    dest[i] = Wire.read();
+  }
+}
+
+void readAccelData() {
+  uint8_t rawData[6];
+  readRegisters(MPU6050_ADDRESS, ACCEL_XOUT_H, 6, rawData);
+
+  accel_x = ((int16_t)(rawData[0] << 8 | rawData[1])) / ACCEL_SCALE + 0.002;
+  accel_y = ((int16_t)(rawData[2] << 8 | rawData[3])) / ACCEL_SCALE - 0.008;
+  accel_z = ((int16_t)(rawData[4] << 8 | rawData[5])) / ACCEL_SCALE + 0.020;
+}
+
+void readGyroData() {
+  uint8_t rawData[6];
+  readRegisters(MPU6050_ADDRESS, GYRO_XOUT_H, 6, rawData);
+
+  gyro_x = ((int16_t)(rawData[0] << 8 | rawData[1])) / GYRO_SCALE * (PI / 180.0);
+  gyro_y = ((int16_t)(rawData[2] << 8 | rawData[3])) / GYRO_SCALE * (PI / 180.0);
+  gyro_z = ((int16_t)(rawData[4] << 8 | rawData[5])) / GYRO_SCALE * (PI / 180.0);
+}
+
+void calculateDisplacement() {
+  // 속도 적분
+  velocity_x += accel_x * dt;
+  velocity_y += accel_y * dt;
+
+  // 변위 적분
+  displacement_x += velocity_x * dt;
+  displacement_y += velocity_y * dt;
+}
+
+void calculateDirection() {
+  angleZ += gyro_z * dt;
 }
