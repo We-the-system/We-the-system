@@ -57,7 +57,7 @@ void loop() {
     for(uint8_t j=0; j<NUMBER_OF_ROWS; j++){
       write_Max7219(j+1, matrix[i][j], true);
     }
-    temp=displacement_square/mapping_unit
+    temp=displacement_square/mapping_unit;
     if (temp>1){
       i=i+temp;
     }
