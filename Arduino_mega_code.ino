@@ -33,6 +33,7 @@ float velocity_y = 0.0;
 float displacement_x = 0.0;
 float displacement_y = 0.0;
 float angleZ = 0.0;
+int crash = 99999999;
 
 //relay_channel
 int relay1 = 7;
@@ -135,6 +136,10 @@ void mpu() {
   
   calculateDirection();
   calculateDisplacement();
+
+  if (accel_x^2+accel_y^2+accel_z^2 > crash){
+    relay_channel_off();
+  }
 
   Serial.print(displacement_x);
   Serial.print(" ");
