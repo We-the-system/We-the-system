@@ -21,7 +21,8 @@
 #define MPU6050_ADDRESS 0x68
 #define ACCEL_XOUT_H 0x3B
 #define GYRO_XOUT_H 0x43
-// MPU6050의 스케일 팩터 설정
+
+// MPU6050의 스케일 설정
 const float ACCEL_SCALE = 16384.0; // 16384 LSB/g
 const float GYRO_SCALE = 131.0;    // 131 LSB/(º/s)
 const float dt_ = 0.01;
@@ -33,6 +34,9 @@ float displacement_x = 0.0;
 float displacement_y = 0.0;
 float angleZ = 0.0;
 
+//relay_channel
+int relay1 = 7;
+int relay2 = 6;
 
 volatile int EncoderCount_L = 0; //per one rotation
 float kp, kd, ki;
@@ -66,6 +70,10 @@ void setup() {
   PID_gain();
 
   writeRegister(MPU6050_ADDRESS, 0x6B, 0);
+
+  pinMode(relay1, OUTPUT);
+  pinMode(relay2, OUTPUT);
+
 }
 
 void loop() {
@@ -80,7 +88,12 @@ void loop() {
   EncoderCount_L = 0;
   preT = nowT;
 
+  //mpu6050
   mpu();
+
+  //relay channel switching
+  relay_channel_on();
+  relay_channel_off();
 }
 
 //반시계 방향이 정방향일 때 (Left Motor 기준)
@@ -193,4 +206,18 @@ void calculateDisplacement() {
 
 void calculateDirection() {
   angleZ += gyro_z * dt;
+}
+
+void relay_channel_on() 
+{
+   digitalWrite(relay1, HIGH);
+   digitalWrite(relay2, LOW);
+   delay(1000);
+}
+
+void relay_channel_off() 
+{
+   digitalWrite(relay1, LOW);
+   digitalWrite(relay2, HIGH);
+   delay(1000);
 }
