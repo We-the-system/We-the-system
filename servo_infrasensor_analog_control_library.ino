@@ -1,51 +1,84 @@
 //라이브러리와 내장함수를 사용하는 경우
 //아날로그 핀을 사용하는 경우
 //서보모터용으로 개별적인 아두이노 우노를 사용하는 경우
-//회전 방향을 탐지한 경우에는 최대 회전(왼쪽 최대 or 오른쪽 최대)으로 회전하도록 하는 코드
+
 
 #include <Servo.h> //라이브러리 추가
 
-Servo motor_servo; // Servo 클래스로 motor_servo 객체 생성
-int servoPin = 7; // 모터 제어핀을  디지털 7번 핀으로 설정(PWM)
-// #define servoPin 7 // 모터 제어핀을  디지털 7번 핀으로 설정(PWM)을 define을 통해 코딩
-int servo_angle = 90; //각도 조절 변수, 초기값을 직진 값으로 설정
+//pin
+#define SERVOPIN 7
+#define INFRA_SENSOR_L_PIN A0 
+#define INFRA_SENSOR_R_PIN A1
 
-int infra_sensorPin_L = A0; //왼쪽 적외선 센서의 신호핀을 A0핀에 연결
-// #define infra_sensorPin_L A0 //왼쪽 적외선 센서의 신호핀을 A0핀에 연결을 define을 통해 코딩
-int infra_sensorPin_R = A1; //오른쪽 적외선 센서의 신호핀을 A1핀에 연결
-// #define infra_sensorPin_R A1 //오른쪽 적외선 센서의 신호핀을 A1핀에 연결을 define을 통해 코딩
-int infra_sensor_value_L = 0; //왼쪽 적외선 센서로 부터 얻은 아날로그 값에 대한 초기화
-int infra_sensor_value_R = 0; //오른쪽 적외선 센서로 부터 얻은 아날로그 값에 대한 초기화
+#define RIGHT_MAX_ANGLE 180
+#define LEFT_MAX_ANGLE 0
+
+Servo motor_servo; // Servo 클래스로 motor_servo 객체 생성
+int servo_angle = 90; //각도 조절 변수, 초기값을 직진 값으로 설정
+//PID variable
+double integral = 0.0;
+double pre_error = 0.0;
+double deriavative = 0.0;
+double proportional =0.0;
+long prevT = 0;
 
 void setup() {
-  pinMode(servoPin, OUTPUT); //servoPin을 출력으로 설정
-  motor_servo.attach(7); //서보 모터의 신호선을 디지털 7번핀에 연결
-  //Serial.begin(9600);
-  pinMode(infra_sensorPin_L, INPUT); //왼쪽 적외선 센서의 신호핀을 입력으로 설정
-  pinMode(infra_sensorPin_R, INPUT); //오른쪽 적외선 센서의 신호핀을 입력으로 설정
-  motor_servo.write(servo_angle); //처음 동작할 때 직진으로 서보모터를 설정
+    pinMode(SERVOPIN, OUTPUT); 
+    motor_servo.attach(SERVOPIN); 
+    Serial.begin(9600);
+    pinMode(INFRA_SENSOR_L_PIN, INPUT); 
+    pinMode(INFRA_SENSOR_R_PIN, INPUT); 
+    motor_servo.write(servo_angle); 
 }
 
 void loop() {
-  infra_sensor_value_L = analogRead(infra_sensorPin_L); //왼쪽 적외선 센서로 부터 읽은 아날로그 값을 변수에 저장
-  infra_sensor_value_R = analogRead(infra_sensorPin_R); //오른쪽 적외선 센서로 부터 읽은 아날로그 값을 변수에 저장
+    double error = 0; //이거 뺄지 말지 정하기 누적되면 빼야함
+    float kp=0.3;
+    float ki=0.15;
+    float kd=0.05;
 
-  servo_angle = comparator(infra_sensor_value_L,infra_sensor_value_R); //comparator 함수를 통해 서보모터 회전 방향에 대한 정보를 servo_angle 변수에 저장
-  motor_servo.write(servo_angle); //servo_angle 값을 통해 서보모터 회전
+    long currT = millis();
+
+    //만약 차량이 움직이기 시작하면 (가속도 센서 값 여기에 붙이면 좋을 듯)
+    int infra_sensor_value_L = analogRead(infra_sensorPin_L);
+    int infra_sensor_value_R = analogRead(infra_sensorPin_R); 
+    int aver_sensor_value = (infra_sensor_value_L + infra_sensor_value_R)/2;
+
+    servo_angle = comparator(infra_sensor_value_L,infra_sensor_value_R);
+    
+    if (aver_sensor_value>500)//완전히 선이 정중앙에 있을 때 측정값 넣어서 바꾸기
+        error = aver_sensor_value - 320;
+        double dt = (double)(currT - prevT)/1000.0;
+        proportional = error;
+        integral = integral + error*dt;
+        double derivative = (error-pre_error)/dt;
+        int output = (int)((kp*proportional) + (ki*integral)+(kd*derivative));//아래 자리 버리기(int)
+        if (servo_angle == LEFT_MAX_ANGLE)
+            motor_servo.write(servo_angle+output);//실험해서 바꾸기
+        else if (servo_angle == RIGHT_MAX_ANGLE)
+            motor_servo.write(servo_angle-output);//실험해서 바꾸기
+        else
+            motor_servo_write(servo_angle);
+    else
+        motor_servo.write(servo_angle); //servo_angle 값을 통해 서보모터 회전
+
+    //for next loop
+    pre_error = error;
+    prevT = currT;
 }
-//매개변수로 전달된 양쪽 센서의 값에 대한 비교를 통해 라인의 색을 분석하고 이를 통해 회전 방향을 결정하는 함수
+
 int comparator(int sensor_left, int sensor_right){
-  if(sensor_left > sensor_right){
-    if(sensor_left > 320){
-      return 0;
+    if(sensor_left > sensor_right){
+        if(sensor_left > 320){
+            return LEFT_MAX_ANGLE;//왼쪽
+        }
     }
-  }
-  else if(sensor_left < sensor_right){
-    if(sensor_right > 320){
-      return 180;
+    else if(sensor_left < sensor_right){
+        if(sensor_right > 320){
+            return RIGHT_MAX_ANGLE;//오른쪽
+        }
     }
-  }
-  else{
-    return 90;
-  } 
+     else{
+        return (RIGHT_MAX_ANGLE + LEFT_MAX_ANGLE)/2;//직진
+    } 
 }
