@@ -11,6 +11,7 @@ void setup() {
 
 void loop() {
   HC05_t.print("information"); // 통신으로 보내고자 하는 정보를 입력
+  //displacement value_x,y,z
   delay(1000); // 딜레이를 1000ms로 설정 즉, 1초마다 블루투스 모듈을 통해 정보 송신
   //HC05 블루투스 모듈의 경우 carriage return을 붙여서 정보를 전송
 
