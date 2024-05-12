@@ -1,4 +1,3 @@
-
 #define Motor_pin1 2 // Yellow
 #define Motor_pin2 3 // White
 #define Encoder_A 18
