@@ -4,11 +4,6 @@
 #define Encoder_B 19
 #define ENA 9
 
-#define timeinterval 1000
-
-int motor1pin1 = 2;
-int motor1pin2 = 3;
-//int motor2pin1 = 4; int motor2pin2 = 5;
 volatile long EncoderCount = 0;
 
 void setup() {
@@ -16,7 +11,7 @@ void setup() {
   pinMode(Motor_pin2, OUTPUT);
   pinMode(Encoder_A, INPUT);
   pinMode(Encoder_B, INPUT);
-  attachInterrupt(digitalPinToInterrupt(18), EncoderPositionRead, RISING);
+  attachInterrupt(digitalPinToInterrupt(Encoder_A), EncoderPositionRead, RISING);
   Serial.begin(9600);
 
 }
