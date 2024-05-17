@@ -42,13 +42,13 @@ void loop() {
   float output = PID_pos_sync(EncoderCount_L, kp, kd, ki);
   Motor_R_Drive(output);
 
-  // 시리얼 플로터를 위한 데이터 출력
+  // for serial plot
   Serial.print("EncoderCount_L:");
   Serial.print(EncoderCount_L);
   Serial.print(",");
   Serial.print("EncoderCount_R:");
   Serial.println(EncoderCount_R);
-
+  delay(100);
 }
 
 void init_INT(){
