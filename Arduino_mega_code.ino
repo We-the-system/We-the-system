@@ -36,8 +36,8 @@ float angleZ = 0.0;
 int crash = 99999999;
 
 //relay_channel
-int relay1 = 7;
-int relay2 = 6;
+#define relay1 PB6 //digital pin 12
+#define relay2 PB7 //digital pin 13
 
 volatile int EncoderCount_L = 0; //per one rotation
 float kp, kd, ki;
@@ -72,9 +72,9 @@ void setup() {
 
   writeRegister(MPU6050_ADDRESS, 0x6B, 0);
 
-  pinMode(relay1, OUTPUT);
-  pinMode(relay2, OUTPUT);
-
+  //pinMode(relay1, OUTPUT);
+  //pinMode(relay2, OUTPUT);
+  DDRB |= (1<<relay1)|(1<<relay2);
 }
 
 void loop() {
@@ -215,14 +215,18 @@ void calculateDirection() {
 
 void relay_channel_on() 
 {
-   digitalWrite(relay1, HIGH);
-   digitalWrite(relay2, LOW);
-   delay(1000);
+   //digitalWrite(relay1, HIGH);
+   //digitalWrite(relay2, HIGH);
+  // PORTB |= (1<<relay1)|(1<<relay2);
+  PORTB |= (1<<relay1);
+  PORTB |= (1<<relay2); //동시진행 안한 이유 회로의 안전성 때문
 }
 
 void relay_channel_off() 
 {
-   digitalWrite(relay1, LOW);
-   digitalWrite(relay2, HIGH);
-   delay(1000);
+   //digitalWrite(relay1, LOW);
+   //digitalWrite(relay2, LOW);
+  //PORTB &= ~((1<<relay1)|(1<<relay2))
+  PORTB &= ~((1<<relay1));
+  PORTB &= ~((1<<relay2)); //동시진행 안한 이유 회로의 안전성 때문
 }
