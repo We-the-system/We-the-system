@@ -19,8 +19,8 @@
 
 //MPU sensor
 #define MPU6050_ADDRESS 0x68
-#define ACCEL_XOUT_H 0x3B
-#define GYRO_XOUT_H 0x43
+#define Accel 0x3B
+#define Gyro 0x43
 
 // MPU6050의 스케일 설정
 const float ACCEL_SCALE = 16384.0; // 16384 LSB/g
@@ -183,7 +183,7 @@ void readRegisters(uint8_t address, uint8_t reg, uint8_t count, uint8_t* dest) {
 
 void readAccelData() {
   uint8_t rawData[6];
-  readRegisters(MPU6050_ADDRESS, ACCEL_XOUT_H, 6, rawData);
+  readRegisters(MPU6050_ADDRESS, Accel, 6, rawData);
 
   accel_x = ((int16_t)(rawData[0] << 8 | rawData[1])) / ACCEL_SCALE + 0.002;
   accel_y = ((int16_t)(rawData[2] << 8 | rawData[3])) / ACCEL_SCALE - 0.008;
@@ -192,7 +192,7 @@ void readAccelData() {
 
 void readGyroData() {
   uint8_t rawData[6];
-  readRegisters(MPU6050_ADDRESS, GYRO_XOUT_H, 6, rawData);
+  readRegisters(MPU6050_ADDRESS, Gyro, 6, rawData);
 
   gyro_x = ((int16_t)(rawData[0] << 8 | rawData[1])) / GYRO_SCALE * (PI / 180.0);
   gyro_y = ((int16_t)(rawData[2] << 8 | rawData[3])) / GYRO_SCALE * (PI / 180.0);
