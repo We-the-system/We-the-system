@@ -18,13 +18,14 @@
 #define pwm_L 255
 
 //MPU sensor
+//I2C communication for arudino mega pin number none upper right part SCL SDA
 #define MPU6050_ADDRESS 0x68
 #define Accel 0x3B
 #define Gyro 0x43
 
 // MPU6050의 스케일 설정
 const float ACCEL_SCALE = 16384.0; // 16384 LSB/g
-const float GYRO_SCALE = 131.0;    // 131 LSB/(º/s)
+const float GYRO_SCALE = 131.0;    // 131 LSB/(*/s)
 const float dt_ = 0.01;
 float accel_x, accel_y, accel_z;
 float gyro_x, gyro_y, gyro_z;
