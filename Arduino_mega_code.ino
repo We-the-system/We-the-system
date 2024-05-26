@@ -159,11 +159,11 @@ void loop() {
   HC05_t.print("gyro_z_str");
 
 ///////////////////////////////////////
-  //relay channel switching
-  relay_channel_on();
-  delay(10000);
-  relay_channel_off();
-  delay(1000);
+  // //relay channel switching
+  // relay_channel_on();
+  // delay(10000);
+  // relay_channel_off();
+  // delay(1000);
 ///////////////////////////////////////
 
   // serial plotting
