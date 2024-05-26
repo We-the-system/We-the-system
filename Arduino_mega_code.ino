@@ -17,24 +17,32 @@
 
 #define pwm_L 255
 
-//MPU sensor
-//I2C communication for arudino mega pin number none upper right part SCL SDA
-#define MPU6050_ADDRESS 0x68
-#define Accel 0x3B
-#define Gyro 0x43
+//mpu9250
+#define ACCEL_CONFIG      0x1C
+#define GYRO_CONFIG       0x1B
+#define USER_CTRL         0x6A
+#define ACCEL_XOUT_H      0x3B
+#define ACCEL_XOUT_L      0x3C
+#define ACCEL_YOUT_H      0x3D
+#define ACCEL_YOUT_L      0x3E
+#define ACCEL_ZOUT_H      0x3F
+#define ACCEL_ZOUT_L      0x40
+#define GYRO_XOUT_H       0x43
+#define GYRO_XOUT_L       0x44
+#define GYRO_YOUT_H       0x45
+#define GYRO_YOUT_L       0x46
+#define GYRO_ZOUT_H       0x47
+#define GYRO_ZOUT_L       0x48
 
-// MPU6050의 스케일 설정
-const float ACCEL_SCALE = 16384.0; // 16384 LSB/g
-const float GYRO_SCALE = 131.0;    // 131 LSB/(*/s)
-const float dt_ = 0.01;
-float accel_x, accel_y, accel_z;
-float gyro_x, gyro_y, gyro_z;
-float velocity_x = 0.0;
-float velocity_y = 0.0;
-float displacement_x = 0.0;
-float displacement_y = 0.0;
-float angleZ = 0.0;
+uint8_t acc_full_scale = 0x01; // Set accel scale (+-2g: 0x00, +-4g: 0x01, +-8g: 0x02, +- 16g: 0x03)
+uint8_t gyro_full_scale = 0x02; // Set gyro scale (00 = +250dps, 01= +500 dps, 10 = +1000 dps, 11 = +2000 dps )
 int crash = 99999999;
+float   accel_scale, gyro_scale;
+float   accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z;
+char    accel_x_str[10], accel_y_str[10], accel_z_str[10], gyro_x_str[10], gyro_y_str[10], gyro_z_str[10];
+uint8_t rawData_accel[6], rawData_gyro[6];
+int16_t accelCount[3], gyroCount[3];
+char    message[255] = {0,};
 
 //relay_channel
 #define relay1 PB6 //digital pin 12
@@ -71,7 +79,16 @@ void setup() {
   analogWrite(EN_L, pwm_L);
   PID_gain();
 
-  writeRegister(MPU6050_ADDRESS, 0x6B, 0);
+  DDRB |=  (1 << PB2) | (1 << PB3) | (1 << PB5);
+  DDRB &= ~(1 << PB4); //NCS DISABLE for SPI communication
+  SPCR |=   (1 << SPE)  | (1 << MSTR) | (1 << SPR0);
+  SPCR &= ~((1 << DORD) | (1 << CPOL) | (1 << CPHA) | (1 << SPR1));
+  PORTB |= (1 << PB2); 
+  setup_scale(acc_full_scale, gyro_full_scale);
+  //disable i2c
+  uint8_t current_setting = transfer_SPI(USER_CTRL, 0x00, true); // Read USER_CTRL
+  current_setting |= 0x10;   // Set I2C_IF_DIS to one (I2C_IF_DIS: bit 4 of USER_CTRL register)
+  transfer_SPI(USER_CTRL, current_setting, false);   // Write USER_CTRL
 
   //pinMode(relay1, OUTPUT);
   //pinMode(relay2, OUTPUT);
@@ -90,8 +107,11 @@ void loop() {
   EncoderCount_L = 0;
   preT = nowT;
 
-  //mpu6050
-  mpu();
+  //mpu9250
+  read_AccelData();
+  read_GyroData();
+  sprintf(message, "accel_x = %s, accel_y = %s, accel_z = %s, gyro_x = %s, gyro_y = %s, gyro_z = %s,", accel_x_str, accel_y_str, accel_z_str, gyro_x_str, gyro_y_str, gyro_z_str);
+  Serial.println(message);
 
   //relay channel switching
   relay_channel_on();
@@ -131,73 +151,127 @@ float Convert_CtoV(int count, double dt){
   return velocity;
 }
 
-void mpu() {
-  readAccelData();
-  readGyroData();
+uint8_t transfer_SPI(uint8_t registerAddress, uint8_t data, bool isRead) {
+    uint8_t response = 0x00;
+    // Set MSB = 1 for read
+    registerAddress |= (isRead ? 0x80 : 0x00);    
+    
+    // SS: low (active)
+    PORTB &= ~(1 << PB2);      
+    
+    // Register Address transfer
+    SPDR = registerAddress;
+    while (!(SPSR & (1 << SPIF)));    
+    // Data transfer
+    SPDR = data;
+    while (!(SPSR & (1 << SPIF)));
+    response = SPDR;
+    
+    // SS: high (inactive)
+    PORTB |= (1 << PB2);  
+    return response;
+}
+
+void setup_scale(uint8_t scale_a, uint8_t scale_g) {
+  uint8_t current_config_accel = transfer_SPI(ACCEL_CONFIG, 0x00, true);
+  uint8_t current_config_gyro = transfer_SPI(GYRO_CONFIG, 0x00, true);
   
-  calculateDirection();
-  calculateDisplacement();
+  current_config_accel &= ~0x18; // Set 00 to ACCEL_FS_SEL[1:0]
+  current_config_gyro &= ~0x18;
 
-  if (accel_x^2+accel_y^2+accel_z^2 > crash){
-    relay_channel_off();
+  current_config_accel |= (scale_a << 3); // Set ACCEL_FS_SEL to scale
+  current_config_gyro |= (scale_g << 3); // Set ACCEL_FS_SEL to scale
+
+
+  transfer_SPI(ACCEL_CONFIG, current_config_accel, false); // Write accel config
+
+  // Set resolution
+  switch (scale_a) {
+    case 0x00: // +- 2g
+      accel_scale = 2.0f / 32768.0f;
+      break;
+    case 0x01: // +- 4g
+      accel_scale = 4.0f / 32768.0f;
+      break;
+    case 0x02: // +- 8g
+      accel_scale = 8.0f / 32768.0f;
+      break;
+    case 0x03: // +- 16g
+      accel_scale = 16.0f / 32768.0f;
+      break;
   }
 
-  Serial.print(displacement_x);
-  Serial.print(" ");
-  Serial.print(displacement_y);
-  Serial.print(" ");
-  Serial.print(angleZ);
-  Serial.print(" ");
+  accel_scale = accel_scale * 9.80665f; //g to m/s^2
 
-  Serial.print(accel_x);
-  Serial.print(",");
-  Serial.print(accel_y);
-  Serial.print(",");
-  Serial.print(accel_z);
-  Serial.print(",");
+  transfer_SPI(GYRO_CONFIG, current_config_gyro, false); // Write accel config
 
-  Serial.print(gyro_x);
-  Serial.print(",");
-  Serial.print(gyro_y);
-  Serial.print(",");
-  Serial.println(gyro_z);
-
-  delay(10);
-}
-
-void writeRegister(uint8_t address, uint8_t reg, uint8_t data) {
-  Wire.beginTransmission(address);
-  Wire.write(reg);
-  Wire.write(data);
-  Wire.endTransmission();
-}
-
-void readRegisters(uint8_t address, uint8_t reg, uint8_t count, uint8_t* dest) {
-  Wire.beginTransmission(address);
-  Wire.write(reg);
-  Wire.endTransmission(false);
-  Wire.requestFrom(address, count, true);
-  for (int i = 0; i < count; i++) {
-    dest[i] = Wire.read();
+    // Set resolution
+  switch (scale_g) {
+    case 0x00: // +- 250 deg
+      gyro_scale = 250.0f / 32768.0f;
+      break;
+    case 0x01: // +- 500 deg
+      gyro_scale = 500.0f / 32768.0f;
+      break;
+    case 0x02: // +- 1000 deg
+      gyro_scale = 1000.0f / 32768.0f;
+      break;
+    case 0x03: // +- 16g
+      gyro_scale = 2000.0f / 32768.0f;
+      break;
   }
+
 }
 
-void readAccelData() {
-  uint8_t rawData[6];
-  readRegisters(MPU6050_ADDRESS, Accel, 6, rawData);
+void read_AccelData() {
+  rawData_accel[0] = transfer_SPI(ACCEL_XOUT_H, 0x00, true);
+  rawData_accel[1] = transfer_SPI(ACCEL_XOUT_L, 0x00, true);
+  rawData_accel[2] = transfer_SPI(ACCEL_YOUT_H, 0x00, true);
+  rawData_accel[3] = transfer_SPI(ACCEL_YOUT_L, 0x00, true);
+  rawData_accel[4] = transfer_SPI(ACCEL_ZOUT_H, 0x00, true);
+  rawData_accel[5] = transfer_SPI(ACCEL_ZOUT_L, 0x00, true);
+  
+  accelCount[0] = (rawData_accel[0] << 8) | rawData_accel[1];
+  accelCount[1] = (rawData_accel[2] << 8) | rawData_accel[3];
+  accelCount[2] = (rawData_accel[4] << 8) | rawData_accel[5];
 
-  accel_x = ((int16_t)(rawData[0] << 8 | rawData[1])) / ACCEL_SCALE + 0.002;
-  accel_y = ((int16_t)(rawData[2] << 8 | rawData[3])) / ACCEL_SCALE - 0.008;
-  accel_z = ((int16_t)(rawData[4] << 8 | rawData[5])) / ACCEL_SCALE + 0.020;
+  accel_x = accelCount[0] * accel_scale;
+  accel_y = accelCount[1] * accel_scale;
+  accel_z = accelCount[2] * accel_scale;
+  
+  dtostrf(accel_x, 4, 2, accel_x_str);
+  dtostrf(accel_y, 4, 2, accel_y_str);
+  dtostrf(accel_z, 4, 2, accel_z_str);
+
+
+  //accel_x = ((int16_t)(rawData[0] << 8 | rawData[1])) / ACCEL_SCALE + 0.002;
+  //accel_y = ((int16_t)(rawData[2] << 8 | rawData[3])) / ACCEL_SCALE - 0.008;
+  //accel_z = ((int16_t)(rawData[4] << 8 | rawData[5])) / ACCEL_SCALE + 0.020;
 }
 
-void readGyroData() {
-  uint8_t rawData[6];
-  readRegisters(MPU6050_ADDRESS, Gyro, 6, rawData);
+void read_GyroData() {
+  rawData_gyro[0] = transfer_SPI(GYRO_XOUT_H, 0x00, true);
+  rawData_gyro[1] = transfer_SPI(GYRO_XOUT_L, 0x00, true);
+  rawData_gyro[2] = transfer_SPI(GYRO_YOUT_H, 0x00, true);
+  rawData_gyro[3] = transfer_SPI(GYRO_YOUT_L, 0x00, true);
+  rawData_gyro[4] = transfer_SPI(GYRO_ZOUT_H, 0x00, true);
+  rawData_gyro[5] = transfer_SPI(GYRO_ZOUT_L, 0x00, true);
 
-  gyro_x = ((int16_t)(rawData[0] << 8 | rawData[1])) / GYRO_SCALE * (PI / 180.0);
-  gyro_y = ((int16_t)(rawData[2] << 8 | rawData[3])) / GYRO_SCALE * (PI / 180.0);
-  gyro_z = ((int16_t)(rawData[4] << 8 | rawData[5])) / GYRO_SCALE * (PI / 180.0);
+  gyroCount[0] = (rawData_gyro[0] << 8) | rawData_gyro[1];
+  gyroCount[1] = (rawData_gyro[2] << 8) | rawData_gyro[3];
+  gyroCount[2] = (rawData_gyro[4] << 8) | rawData_gyro[5];
+
+  gyro_x = gyroCount[0] * gyro_scale;
+  gyro_y = gyroCount[1] * gyro_scale;
+  gyro_z = gyroCount[2] * gyro_scale;
+
+  dtostrf(gyro_x, 4, 2, gyro_x_str);
+  dtostrf(gyro_y, 4, 2, gyro_y_str);
+  dtostrf(gyro_z, 4, 2, gyro_z_str);
+
+  //gyro_x = ((int16_t)(rawData[0] << 8 | rawData[1])) / GYRO_SCALE * (PI / 180.0);
+  //gyro_y = ((int16_t)(rawData[2] << 8 | rawData[3])) / GYRO_SCALE * (PI / 180.0);
+  //gyro_z = ((int16_t)(rawData[4] << 8 | rawData[5])) / GYRO_SCALE * (PI / 180.0);
 }
 
 void calculateDisplacement() {
