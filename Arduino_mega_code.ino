@@ -41,6 +41,16 @@ uint8_t gyro_full_scale = 0x02; // Set gyro scale (00 = +250dps, 01= +500 dps, 1
 int crash = 99999999;
 float   accel_scale, gyro_scale;
 float   accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z;
+const float dt = 0.01; //time vary
+float velocity_x = 0.0;
+float velocity_y = 0.0;
+float velocity_z = 0.0;
+float displacement_x = 0.0;
+float displacement_y = 0.0;
+float displacement_z = 0.0;
+float angle_x = 0.0;
+float angle_y = 0.0;
+float angle_z = 0.0;
 char    accel_x_str[10], accel_y_str[10], accel_z_str[10], gyro_x_str[10], gyro_y_str[10], gyro_z_str[10];
 uint8_t rawData_accel[6], rawData_gyro[6];
 int16_t accelCount[3], gyroCount[3];
@@ -292,14 +302,20 @@ void calculateDisplacement() {
   // 속도 적분
   velocity_x += accel_x * dt;
   velocity_y += accel_y * dt;
+  velocity_z += accel_z * dt;
+
 
   // 변위 적분
   displacement_x += velocity_x * dt;
   displacement_y += velocity_y * dt;
+  displacement_z += velocity_z * dt;
 }
 
 void calculateDirection() {
-  angleZ += gyro_z * dt;
+  angle_x += gyro_x * dt;
+  angle_y += gyro_y * dt;
+  angle_z += gyro_z * dt;
+  
 }
 
 void relay_channel_on() 
