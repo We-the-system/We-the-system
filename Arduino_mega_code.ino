@@ -41,7 +41,7 @@ uint8_t gyro_full_scale = 0x02; // Set gyro scale (00 = +250dps, 01= +500 dps, 1
 int crash = 99999999;
 float   accel_scale, gyro_scale;
 float   accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z;
-const float mpu_dt = 0.01; //time vary
+const float mpu_dt = 0.01; //time vary 10ms
 float velocity_x = 0.0;
 float velocity_y = 0.0;
 float velocity_z = 0.0;
@@ -55,6 +55,13 @@ char    accel_x_str[10], accel_y_str[10], accel_z_str[10], gyro_x_str[10], gyro_
 uint8_t rawData_accel[6], rawData_gyro[6];
 int16_t accelCount[3], gyroCount[3];
 char    message[255] = {0,};
+
+unsigned long previousMillis = 0;
+float filter_x=0;
+float filter_y=0;
+float filter_z=0;
+int temp_motorcount = 0;
+int temp_timecount = 0;
 
 //relay_channel
 #define relay1 PB6 //digital pin 12
@@ -126,10 +133,25 @@ void loop() {
   preT = nowT;
 
   //mpu9250
-  read_AccelData();
-  read_GyroData();
-  sprintf(message, "accel_x = %s, accel_y = %s, accel_z = %s, gyro_x = %s, gyro_y = %s, gyro_z = %s,", accel_x_str, accel_y_str, accel_z_str, gyro_x_str, gyro_y_str, gyro_z_str);
-  Serial.println(message);
+    unsigned long currentMillis = millis();
+
+  if (currentMillis - previousMillis >= dt * 1000) {
+    previousMillis = currentMillis;
+
+    read_AccelData();
+    read_GyroData();
+
+    //filter_temp();
+    lowpass_filter();
+    thresholding_filter();
+    calculateDisplacement();
+
+    //Serial.print("accel_x = "); Serial.print(accel_x); Serial.print(", accel_y = "); Serial.print(accel_y); Serial.print(", accel_z = "); Serial.println(accel_z);
+    //Serial.print("filter_x = "); Serial.print(filter_x); Serial.print(", filter_y = "); Serial.print(filter_y); Serial.print(", filter_z = "); Serial.println(filter_z);
+    
+    //Serial.print("velocity_x = "); Serial.print(velocity_x); Serial.print(", velocity_y = "); Serial.print(velocity_y); Serial.print(", velocity_z = "); Serial.println(velocity_z);
+    Serial.print("displacement_x = "); Serial.print(displacement_x); Serial.print(", displacement_y = "); Serial.print(displacement_y); Serial.print(", displacement_z = "); Serial.println(displacement_z);
+  }
 
   HC05_t.print("accel_x_str"); // 통신으로 보내고자 하는 정보를 입력
   HC05_t.print("accel_y_str");
@@ -325,6 +347,36 @@ void calculateDirection() {
   angle_z += gyro_z * mpu_dt;
   
 }
+
+void filter_temp(){
+  filter_x=accel_x;
+  filter_y=accel_y;
+  filter_z=accel_z;
+}
+
+void lowpass_filter() {
+  float alpha = 0.5;
+  filter_x = alpha * accel_x + (1 - alpha) * filter_x;
+  filter_y = alpha * accel_y + (1 - alpha) * filter_y;
+  filter_z = alpha * accel_z + (1 - alpha) * filter_z;
+}
+
+void thresholding_filter(){
+  if (filter_x < 0.15)
+    filter_x = 0;
+  if (filter_y < 0.15)
+    filter_y = 0;
+  if (filter_z < 0.15)
+    filter_z = 0;
+  if (temp_timecount==500){
+    if (temp_motorcount==EncoderCount_L)
+      velocity_x=velocity_y=velocity_z=0;
+    else:
+      temp_motorcount = EncoderCount_L;
+  }
+  temp_timecount ++;
+}
+
 
 void relay_channel_on() 
 {
