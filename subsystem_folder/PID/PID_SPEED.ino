@@ -57,7 +57,9 @@ void loop() {
 void Motor_Drive(float output, float target, float real) {
   if (output < 0) output = -output;
   pwm_L = (int)output;
-  if (pwm_L > 255) pwm_L = 255;
+  if (target<real){
+    pwm_L = 0;
+  else if (pwm_L > 255) pwm_L = 255;
   analogWrite(EN_L, pwm_L); 
 }
 
