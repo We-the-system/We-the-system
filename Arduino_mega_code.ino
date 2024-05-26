@@ -1,23 +1,19 @@
 #include <SoftwareSerial.h>
 
-#define ENC_COUNT_REV 330 //pulse per 1 rotation(360degree)
-#define WHEEL_RADIUS 0.067
+#define FOSC 16000000
+#define BAUD 9600
+#define ENC_COUNT_REV 330 // CPR
+#define WHEEL_RADIUS 0.075
 
-//Left Motor
-#define Encoder_L_PulseA 18 // Yellow
-#define Encoder_L_PulseB 19 // White
-#define EN_L 9 //left velocity
-#define Motor_L_pin1 2
-#define Motor_L_pin2 3 //left motor 
+#define Encoder_L_PulseA (1<<PD3) //18
+#define Encoder_R_PulseA (1<<PD1) //20 INT1
+#define EN_L 9//(1<<PH6) //9 
+#define EN_R 10//(1<<PB4) //10
+#define Motor_L_pin2 (1<<PE5) //3,  forward
+#define Motor_R_pin2 (1<<PE3) //5, forward
 
-//Right Motor
-#define Encoder_R_PulseA 20 // Yellow
-#define Encoder_R_PulseB 21 // White
-#define Motor_R_pin1 4 
-#define Motor_R_pin2 5 //right motor
-#define EN_R 10 //right velocity
-
-#define pwm_L 255
+#define relay1 PB6 //digital pin 12
+#define relay2 PB7 //digital pin 13
 
 //mpu9250
 #define ACCEL_CONFIG      0x1C
@@ -36,9 +32,21 @@
 #define GYRO_ZOUT_H       0x47
 #define GYRO_ZOUT_L       0x48
 
+volatile long EncoderCount_L = 0;
+volatile long EncoderCount_R = 0;
+
+volatile long pre_EncoderCount_L = 0;
+float e_integral_speed = 0.0;
+float e_integral_pos = 0.0;
+long preT = 0;
+float pre_error_position = 0.0;
+float pre_error_speed = 0.0;
+
+volatile int pwm_L = 240; // 초기 pwm
+
 uint8_t acc_full_scale = 0x01; // Set accel scale (+-2g: 0x00, +-4g: 0x01, +-8g: 0x02, +- 16g: 0x03)
 uint8_t gyro_full_scale = 0x02; // Set gyro scale (00 = +250dps, 01= +500 dps, 10 = +1000 dps, 11 = +2000 dps )
-int crash = 99999999;
+int crash = 1000;
 float   accel_scale, gyro_scale;
 float   accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z;
 const float mpu_dt = 0.01; //time vary 10ms
@@ -63,43 +71,26 @@ float filter_z=0;
 int temp_motorcount = 0;
 int temp_timecount = 0;
 
-//relay_channel
-#define relay1 PB6 //digital pin 12
-#define relay2 PB7 //digital pin 13
-
-volatile int EncoderCount_L = 0; //per one rotation
-float kp, kd, ki;
-double integral = 0.0;
-long preT = 0;
-double error=0.0;
-double pre_error=0.0;
-
 //communication
 SoftwareSerial HC05_t(2, 3); // 아두이노 보드 기준(RX, TX), 블루투스 모듈 기준(TXD, RXD)으로 핀을 2번 3번으로 설정
 
+
 void setup() {
-  Serial.begin(115200);
-  //left motor pinmode
-  pinMode(Motor_L_pin1, OUTPUT);
-  pinMode(Motor_L_pin2, OUTPUT);
-  pinMode(EN_L,  OUTPUT);
-  pinMode(Encoder_L_PulseA, INPUT);
-  pinMode(Encoder_L_PulseB, INPUT);
-
-  //right motor pinmode
-  pinMode(Motor_R_pin1, OUTPUT);
-  pinMode(Motor_R_pin2, OUTPUT);
-  pinMode(EN_R,  OUTPUT);
-  pinMode(Encoder_R_PulseA, INPUT_PULLUP);
-  pinMode(Encoder_R_PulseB, INPUT_PULLUP);
-  delay(5000); // delay 5 seconds to run
-
-  attachInterrupt(digitalPinToInterrupt(Encoder_L_PulseA),EncoderPositionRead, RISING);
-
-  digitalWrite(Motor_L_pin1, HIGH);
-  digitalWrite(Motor_L_pin2, LOW); //확인해보기 앞 뒤 주행
+  serial_baud(); //instead of serial.begin
+  DDRE |= (Motor_L_pin2); //pinMode(Motor_L_pin2, OUTPUT);
+  DDRE |= (Motor_R_pin2); //pinMode(Motor_R_pin2, OUTPUT);
+  pinMode(EN_L, OUTPUT);
+  pinMode(EN_R, OUTPUT);
+  DDRD &= ~(Encoder_L_PulseA); //pinMode(Encoder_L_PulseA, INPUT);
+  DDRD &= ~(Encoder_R_PulseA); //pinMode(Encoder_R_PulseA, INPUT);
+  PORTE |= (Motor_L_pin2); //digitalWrite(Motor_L_pin2, HIGH); //FORWARD
+  PORTE |= (Motor_R_pin2);//digitalWrite(Motor_R_pin2, HIGH); //PORT 활용
   analogWrite(EN_L, pwm_L);
-  PID_gain();
+
+  init_INT();
+
+//global interrupt enable
+  SREG |= 0x01 << SREG_I;
 
   DDRB |=  (1 << PB2) | (1 << PB3) | (1 << PB5);
   DDRB &= ~(1 << PB4); //NCS DISABLE for SPI communication
@@ -118,22 +109,29 @@ void setup() {
 
   //communication
   HC05_t.begin(38400); //아두이노-블루투스모듈간 통신 baud rate 설정
+
 }
 
 void loop() {
+  float kp_pos = 6.0;
+  float ki_pos = 0.7;
+  float kd_pos = 6.8;
   long nowT = micros();
-  double dt = ((double)(nowT - preT)/1.0e6);
-  float velocity_L = Convert_CtoV(EncoderCount_L, dt);
+  float dt = ((float)(nowT - preT) / (1.0e6));
+  long current_count = EncoderCount_L - pre_EncoderCount_L;
+  pre_EncoderCount_L = EncoderCount_L;
 
-  //pid
-  pid(error, dt);
+  float velocity_L = Convert_CtoV(current_count, dt); //m/s conversion
+  float target_velocity_L = 1.5; //m/s target speed
+  float output_speed = pid_speed(target_velocity_L - velocity_L, dt);
 
-  //for next loop
-  EncoderCount_L = 0;
-  preT = nowT;
+  Motor_L_Drive(output_speed, target_velocity_L, velocity_L);
+  float output_pos = PID_pos_sync(EncoderCount_L, kp_pos, kd_pos, ki_pos);
+  Motor_R_Drive(output_pos);
+
 
   //mpu9250
-    unsigned long currentMillis = millis();
+  unsigned long currentMillis = millis();
 
   if (currentMillis - previousMillis >= dt * 1000) {
     previousMillis = currentMillis;
@@ -145,7 +143,7 @@ void loop() {
     lowpass_filter();
     thresholding_filter();
     calculateDisplacement();
-
+  
     //Serial.print("accel_x = "); Serial.print(accel_x); Serial.print(", accel_y = "); Serial.print(accel_y); Serial.print(", accel_z = "); Serial.println(accel_z);
     //Serial.print("filter_x = "); Serial.print(filter_x); Serial.print(", filter_y = "); Serial.print(filter_y); Serial.print(", filter_z = "); Serial.println(filter_z);
     
@@ -159,48 +157,121 @@ void loop() {
   HC05_t.print("gyro_x_str");
   HC05_t.print("gyro_y_str");
   HC05_t.print("gyro_z_str");
-  //displacement value_x,y,z
-  delay(1000); // 딜레이를 1000ms로 설정 즉, 1초마다 블루투스 모듈을 통해 정보 송신
 
+///////////////////////////////////////
   //relay channel switching
   relay_channel_on();
   delay(10000);
   relay_channel_off();
   delay(1000);
+///////////////////////////////////////
+
+  // serial plotting
+  Serial.print("Target:");
+  Serial.print(target_velocity_L);
+  Serial.print(",");
+  Serial.print("Velocity:");
+  Serial.print(velocity_L);
+  Serial.print(",");
+  Serial.print("PWM:");
+  Serial.println(pwm_L);
+
+  //Serial.print("EncoderCount_L:");
+  //Serial.print(EncoderCount_L);
+  //Serial.print(",");
+  //Serial.print("EncoderCount_R:");
+  //Serial.println(EncoderCount_R);
+  preT = nowT;
+  delay(100);
 }
 
-//반시계 방향이 정방향일 때 (Left Motor 기준)
-void EncoderPositionRead() {
-  if (digitalRead(Encoder_L_PulseA) == digitalRead(Encoder_L_PulseB)) {
-    EncoderCount_L++;
-  } 
-  else {
-    EncoderCount_L--;
-  }
+float pid_speed(float error, float dt) {
+  float kp_speed = 1000.0;
+  float kd_speed = 700.0;
+  float ki_speed = 600.0;
+  float proportional = error;
+  e_integral_speed = e_integral_speed + error * dt;
+  float derivative = (error - pre_error_speed) / dt;
+  float output_speed = (kp_speed * proportional) + (ki_speed * e_integral_speed) + (kd_speed * derivative);
+
+  //for next loop
+  pre_error_speed = error;
+  return output_speed;
 }
 
-void PID_gain(){
-  kp = 0.8;
-  ki = 0.2;
-  kd = 0.1;
+void serial_baud(void){
+  uint16_t ubrr = FOSC / 16 / BAUD - 1;
+  UBRR0H = (unsigned char)(ubrr>>8);
+  UBRR0L = (unsigned char)ubrr;
+  UCSR0B |= (1<<RXEN0) | (1<<TXEN0);
+  UCSR0C |= (1<<USBS0);
+  UCSR0C |= (1<<UCSZ01) | (1<<UCSZ00);
 }
 
-double pid(double error, double dt)
-{
-  double proportional = error;
-  integral = integral + error * dt;
-  double derivative = (error - pre_error) / dt;
-  pre_error = error;
-  double output = (kp * proportional) + (ki * integral) + (kd * derivative);
-  return output;
+
+float PID_pos_sync(int target, float kp_pos, float kd_pos, float ki_pos) {
+  long currentTime = micros(); 
+  float dt = ((float)(currentTime - preT)) / 1.0e6;
+  int error = target - EncoderCount_R;
+  e_integral_pos += error * dt;
+  float e_derivative = (error - pre_error_position) / dt;
+  float output_pos = (kp_pos * error) + (kd_pos * e_derivative) + (ki_pos * e_integral_pos);
+  //for next loop
+  pre_error_position = error;
+  return output_pos;
 }
 
-float Convert_CtoV(int count, double dt){
-  float rpm = (float)(count * 60.0 / ENC_COUNT_REV /dt);
+//motor_l_drive by pid speed
+void Motor_L_Drive(float output, float target, float real) {
+  if (output < 0) output = -output;
+  pwm_L = (int)output;
+
+  if (target<real)
+    pwm_L = 0;
+  else if (pwm_L > 255) 
+    pwm_L = 255;
+  analogWrite(EN_L, pwm_L); 
+}
+
+//motor_r_drive by pid syn
+void Motor_R_Drive(float output) {
+  if (output < 0) output = -output;
+  int pwm_R = (int)output;
+
+  if (EncoderCount_R > EncoderCount_L) 
+    pwm_R = 0;
+  else if (pwm_R > 255) 
+    pwm_R = 255;
+  analogWrite(EN_R, pwm_R); //duty cycle 활용
+}
+
+//to velocity
+float Convert_CtoV(int count, float dt) {
+  float rpm = (float)(count * 60.0 / ENC_COUNT_REV / dt);
   float circumference = 2 * 3.141592 * WHEEL_RADIUS;
   float velocity = rpm / 60.0 * circumference;
   return velocity;
 }
+
+//interrupt function
+void init_INT(){
+  EICRA |= (1 << ISC30) | (1 << ISC31); //rising edge for int3
+  EICRA |= (1 << ISC10) | (1 << ISC11); //rising edge for int1
+  EIMSK |= (1 << INT3); //local interrpt for 3
+  EIMSK |= (1 << INT1); //local interrpt for 1
+}
+
+//INT3 ISR
+ISR(INT3_vect) {
+  EncoderCount_L++;
+}
+
+//INT1 ISR
+ISR(INT1_vect) {
+  EncoderCount_R++;
+}
+
+
 
 uint8_t transfer_SPI(uint8_t registerAddress, uint8_t data, bool isRead) {
     uint8_t response = 0x00;
@@ -294,7 +365,7 @@ void read_AccelData() {
   dtostrf(accel_y, 4, 2, accel_y_str);
   dtostrf(accel_z, 4, 2, accel_z_str);
 
-  if (accel_x^2+accel_y^2+accel_z^2 > crash){
+  if (accel_x*accel_x +accel_y*accel_y + accel_z*accel_z > crash){
     relay_channel_off();
   }
 
@@ -371,7 +442,7 @@ void thresholding_filter(){
   if (temp_timecount==500){
     if (temp_motorcount==EncoderCount_L)
       velocity_x=velocity_y=velocity_z=0;
-    else:
+    else
       temp_motorcount = EncoderCount_L;
   }
   temp_timecount ++;
