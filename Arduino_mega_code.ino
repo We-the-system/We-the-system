@@ -272,6 +272,9 @@ void read_AccelData() {
   dtostrf(accel_y, 4, 2, accel_y_str);
   dtostrf(accel_z, 4, 2, accel_z_str);
 
+  if (accel_x^2+accel_y^2+accel_z^2 > crash){
+    relay_channel_off();
+  }
 
   //accel_x = ((int16_t)(rawData[0] << 8 | rawData[1])) / ACCEL_SCALE + 0.002;
   //accel_y = ((int16_t)(rawData[2] << 8 | rawData[3])) / ACCEL_SCALE - 0.008;
