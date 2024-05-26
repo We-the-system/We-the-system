@@ -41,7 +41,7 @@ uint8_t gyro_full_scale = 0x02; // Set gyro scale (00 = +250dps, 01= +500 dps, 1
 int crash = 99999999;
 float   accel_scale, gyro_scale;
 float   accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z;
-const float dt = 0.01; //time vary
+const float mpu_dt = 0.01; //time vary
 float velocity_x = 0.0;
 float velocity_y = 0.0;
 float velocity_z = 0.0;
@@ -300,21 +300,21 @@ void read_GyroData() {
 
 void calculateDisplacement() {
   // 속도 적분
-  velocity_x += accel_x * dt;
-  velocity_y += accel_y * dt;
-  velocity_z += accel_z * dt;
+  velocity_x += accel_x * mpu_dt;
+  velocity_y += accel_y * mpu_dt;
+  velocity_z += accel_z * mpu_dt;
 
 
   // 변위 적분
-  displacement_x += velocity_x * dt;
-  displacement_y += velocity_y * dt;
-  displacement_z += velocity_z * dt;
+  displacement_x += velocity_x * mpu_dt;
+  displacement_y += velocity_y * mpu_dt;
+  displacement_z += velocity_z * mpu_dt;
 }
 
 void calculateDirection() {
-  angle_x += gyro_x * dt;
-  angle_y += gyro_y * dt;
-  angle_z += gyro_z * dt;
+  angle_x += gyro_x * mpu_dt;
+  angle_y += gyro_y * mpu_dt;
+  angle_z += gyro_z * mpu_dt;
   
 }
 
