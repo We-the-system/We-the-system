@@ -113,6 +113,13 @@ void setup() {
 }
 
 void loop() {
+  if (EncoderCount_L % (50*330)== 0){
+    relay_channel_off();
+    delay(100);
+  }
+  else
+    relay_channel_on();
+  
   float kp_pos = 6.0;
   float ki_pos = 0.7;
   float kd_pos = 6.8;
@@ -130,11 +137,8 @@ void loop() {
   Motor_R_Drive(output_pos);
 
 
-  //mpu9250
-  unsigned long currentMillis = millis();
-
-  if (currentMillis - previousMillis >= dt * 1000) {
-    previousMillis = currentMillis;
+  if (nowT*1000 - previousMillis >= dt * 1000) {
+    previousMillis = nowT*1000;
 
     read_AccelData();
     read_GyroData();
@@ -157,14 +161,6 @@ void loop() {
   HC05_t.print("gyro_x_str");
   HC05_t.print("gyro_y_str");
   HC05_t.print("gyro_z_str");
-
-///////////////////////////////////////
-  // //relay channel switching
-  // relay_channel_on();
-  // delay(10000);
-  // relay_channel_off();
-  // delay(1000);
-///////////////////////////////////////
 
   // serial plotting
   Serial.print("Target:");
@@ -360,18 +356,11 @@ void read_AccelData() {
   accel_x = accelCount[0] * accel_scale;
   accel_y = accelCount[1] * accel_scale;
   accel_z = accelCount[2] * accel_scale;
-  
-  dtostrf(accel_x, 4, 2, accel_x_str);
-  dtostrf(accel_y, 4, 2, accel_y_str);
-  dtostrf(accel_z, 4, 2, accel_z_str);
 
   if (accel_x*accel_x +accel_y*accel_y + accel_z*accel_z > crash){
     relay_channel_off();
   }
 
-  //accel_x = ((int16_t)(rawData[0] << 8 | rawData[1])) / ACCEL_SCALE + 0.002;
-  //accel_y = ((int16_t)(rawData[2] << 8 | rawData[3])) / ACCEL_SCALE - 0.008;
-  //accel_z = ((int16_t)(rawData[4] << 8 | rawData[5])) / ACCEL_SCALE + 0.020;
 }
 
 void read_GyroData() {
@@ -389,14 +378,6 @@ void read_GyroData() {
   gyro_x = gyroCount[0] * gyro_scale;
   gyro_y = gyroCount[1] * gyro_scale;
   gyro_z = gyroCount[2] * gyro_scale;
-
-  dtostrf(gyro_x, 4, 2, gyro_x_str);
-  dtostrf(gyro_y, 4, 2, gyro_y_str);
-  dtostrf(gyro_z, 4, 2, gyro_z_str);
-
-  //gyro_x = ((int16_t)(rawData[0] << 8 | rawData[1])) / GYRO_SCALE * (PI / 180.0);
-  //gyro_y = ((int16_t)(rawData[2] << 8 | rawData[3])) / GYRO_SCALE * (PI / 180.0);
-  //gyro_z = ((int16_t)(rawData[4] << 8 | rawData[5])) / GYRO_SCALE * (PI / 180.0);
 }
 
 void calculateDisplacement() {
