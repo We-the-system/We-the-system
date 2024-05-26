@@ -1,3 +1,5 @@
+#include <SoftwareSerial.h>
+
 #define ENC_COUNT_REV 330 //pulse per 1 rotation(360degree)
 #define WHEEL_RADIUS 0.067
 
@@ -55,6 +57,9 @@ long preT = 0;
 double error=0.0;
 double pre_error=0.0;
 
+//communication
+SoftwareSerial HC05_t(2, 3); // 아두이노 보드 기준(RX, TX), 블루투스 모듈 기준(TXD, RXD)으로 핀을 2번 3번으로 설정
+
 void setup() {
   Serial.begin(115200);
   //left motor pinmode
@@ -93,6 +98,9 @@ void setup() {
   //pinMode(relay1, OUTPUT);
   //pinMode(relay2, OUTPUT);
   DDRB |= (1<<relay1)|(1<<relay2);
+
+  //communication
+  HC05_t.begin(38400); //아두이노-블루투스모듈간 통신 baud rate 설정
 }
 
 void loop() {
@@ -113,9 +121,15 @@ void loop() {
   sprintf(message, "accel_x = %s, accel_y = %s, accel_z = %s, gyro_x = %s, gyro_y = %s, gyro_z = %s,", accel_x_str, accel_y_str, accel_z_str, gyro_x_str, gyro_y_str, gyro_z_str);
   Serial.println(message);
 
+  HC05_t.print("information"); // 통신으로 보내고자 하는 정보를 입력
+  //displacement value_x,y,z
+  delay(1000); // 딜레이를 1000ms로 설정 즉, 1초마다 블루투스 모듈을 통해 정보 송신
+
   //relay channel switching
   relay_channel_on();
   relay_channel_off();
+
+  
 }
 
 //반시계 방향이 정방향일 때 (Left Motor 기준)
