@@ -421,7 +421,7 @@ void thresholding_filter(){
   if (filter_z < 0.15)
     filter_z = 0;
   if (temp_timecount==500){
-    if (temp_motorcount==EncoderCount_L)
+    if (temp_motorcount==EncoderCount_L*330)
       velocity_x=velocity_y=velocity_z=0;
     else
       temp_motorcount = EncoderCount_L;
