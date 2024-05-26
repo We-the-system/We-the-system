@@ -131,15 +131,20 @@ void loop() {
   sprintf(message, "accel_x = %s, accel_y = %s, accel_z = %s, gyro_x = %s, gyro_y = %s, gyro_z = %s,", accel_x_str, accel_y_str, accel_z_str, gyro_x_str, gyro_y_str, gyro_z_str);
   Serial.println(message);
 
-  HC05_t.print("information"); // 통신으로 보내고자 하는 정보를 입력
+  HC05_t.print("accel_x_str"); // 통신으로 보내고자 하는 정보를 입력
+  HC05_t.print("accel_y_str");
+  HC05_t.print("accel_z_str");
+  HC05_t.print("gyro_x_str");
+  HC05_t.print("gyro_y_str");
+  HC05_t.print("gyro_z_str");
   //displacement value_x,y,z
   delay(1000); // 딜레이를 1000ms로 설정 즉, 1초마다 블루투스 모듈을 통해 정보 송신
 
   //relay channel switching
   relay_channel_on();
+  delay(10000);
   relay_channel_off();
-
-  
+  delay(1000);
 }
 
 //반시계 방향이 정방향일 때 (Left Motor 기준)
