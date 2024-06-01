@@ -148,9 +148,9 @@ float Convert_CtoV(int count, float dt) {
 //interrupt function
 void init_INT(){
   EICRA |= (1 << ISC30) | (1 << ISC31); //rising edge for int3
-  EICRA |= (1 << ISC00) | (1 << ISC01); //rising edge for int1
+  EICRA |= (1 << ISC00) | (1 << ISC01); //rising edge for int0
   EIMSK |= (1 << INT3); //local interrpt for 3
-  EIMSK |= (1 << INT0); //local interrpt for 1
+  EIMSK |= (1 << INT0); //local interrpt for 0
 }
 
 //INT3 ISR
@@ -158,7 +158,7 @@ ISR(INT3_vect) {
   EncoderCount_L++;
 }
 
-//INT1 ISR
+//INT0 ISR
 ISR(INT0_vect) {
   EncoderCount_R++;
 }
