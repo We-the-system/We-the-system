@@ -1,0 +1,16 @@
+#define relay1 PB6 //digital pin 12
+#define relay2 PB7 //digital pin 13
+
+ 
+void setup(){
+  DDRB |= (1<<relay1)|(1<<relay2);
+}
+void loop(){
+  
+  PORTB |= (1<<relay1);
+  PORTB |= (1<<relay2); //동시진행 안한 이유 회로의 안전성 때문
+  delay(500);                          
+  PORTB &= ~((1<<relay1));
+  PORTB &= ~((1<<relay2)); //동시진행 안한 이유 회로의 안전성 때문
+  delay(500);
+}
