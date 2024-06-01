@@ -4,7 +4,7 @@
 #define WHEEL_RADIUS 0.075
 
 #define Encoder_L_PulseA (1<<PD3) //18
-#define Encoder_R_PulseA (1<<PD1) //20 INT1
+#define Encoder_R_PulseA (1<<PD0) //21
 
 #define EN_L 9//(1<<PH6) //9 
 #define EN_R 10//(1<<PB4) //10
@@ -59,20 +59,20 @@ void loop() {
   Motor_R_Drive(output_pos);
 
   // serial plotting
-  Serial.print("Target:");
-  Serial.print(target_velocity_L);
-  Serial.print(",");
-  Serial.print("Velocity:");
-  Serial.print(velocity_L);
-  Serial.print(",");
-  Serial.print("PWM:");
-  Serial.println(pwm_L);
+  // Serial.print("Target:");
+  // Serial.print(target_velocity_L);
+  // Serial.print(",");
+  // Serial.print("Velocity:");
+  // Serial.print(velocity_L);
+  // Serial.print(",");
+  // Serial.print("PWM:");
+  // Serial.println(pwm_L);
 
   //Serial.print("EncoderCount_L:");
   //Serial.print(EncoderCount_L);
   //Serial.print(",");
-  //Serial.print("EncoderCount_R:");
-  //Serial.println(EncoderCount_R);
+  Serial.print("EncoderCount_R:");
+  Serial.println(EncoderCount_R);
   preT = nowT;
   delay(100);
 }
@@ -148,9 +148,9 @@ float Convert_CtoV(int count, float dt) {
 //interrupt function
 void init_INT(){
   EICRA |= (1 << ISC30) | (1 << ISC31); //rising edge for int3
-  EICRA |= (1 << ISC10) | (1 << ISC11); //rising edge for int1
+  EICRA |= (1 << ISC00) | (1 << ISC01); //rising edge for int1
   EIMSK |= (1 << INT3); //local interrpt for 3
-  EIMSK |= (1 << INT1); //local interrpt for 1
+  EIMSK |= (1 << INT0); //local interrpt for 1
 }
 
 //INT3 ISR
@@ -159,6 +159,6 @@ ISR(INT3_vect) {
 }
 
 //INT1 ISR
-ISR(INT1_vect) {
+ISR(INT0_vect) {
   EncoderCount_R++;
 }
