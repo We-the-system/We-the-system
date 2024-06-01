@@ -114,11 +114,11 @@ void setup() {
 
 void loop() {
   if (EncoderCount_L % (50*330)== 0){
-    relay_channel_off();
-    delay(100);
+    relay_channel_on();
+    delay(1000);
   }
   else
-    relay_channel_on();
+    relay_channel_off();
   
   float kp_pos = 6.0;
   float ki_pos = 0.7;
@@ -358,7 +358,7 @@ void read_AccelData() {
   accel_z = accelCount[2] * accel_scale;
 
   if (accel_x*accel_x +accel_y*accel_y + accel_z*accel_z > crash){
-    relay_channel_off();
+    relay_channel_on();
   }
 
 }
