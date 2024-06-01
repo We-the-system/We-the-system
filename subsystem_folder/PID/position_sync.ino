@@ -3,7 +3,7 @@
 #define Encoder_L_PulseA 18 // INT3
 #define Motor_R_pin2 5
 #define EN_R 10
-#define Encoder_R_PulseA 20 // INT1
+#define Encoder_R_PulseA 21 // INT0
 
 #define PWM_L 240
 
@@ -53,9 +53,9 @@ void loop() {
 
 void init_INT(){
   EICRA |= (1 << ISC30) | (1 << ISC31); //falling
-  EICRA |= (1 << ISC10) | (1 << ISC11); //falling
+  EICRA |= (1 << ISC00) | (1 << ISC01); //falling
   EIMSK |= (1 << INT3); //local interrpt for 3
-  EIMSK |= (1 << INT1); //local interrpt for 1
+  EIMSK |= (1 << INT0); //local interrpt for 1
 }
 
 //INT3 ISR
@@ -64,7 +64,7 @@ ISR(INT3_vect) {
 }
 
 //INT1 ISR
-ISR(INT1_vect) {
+ISR(INT0_vect) {
   EncoderCount_R++;
 }
 
@@ -94,6 +94,5 @@ void Motor_R_Drive(float output) {
   
   digitalWrite(Motor_R_pin2, HIGH); //PORT 활용
   analogWrite(EN_R, pwm_R); //duty cycle 활용
+  Serial.println(pwm_R);
 }
-
-
