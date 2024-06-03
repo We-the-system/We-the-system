@@ -67,6 +67,78 @@ void relay_channel_off()
   PORTB &= ~((1<<relay2)); //동시진행 안한 이유 회로의 안전성 때문
 }
 
+uint8_t transfer_SPI(uint8_t registerAddress, uint8_t data, bool isRead) {
+    uint8_t response = 0x00;
+    // Set MSB = 1 for read
+    registerAddress |= (isRead ? 0x80 : 0x00);    
+    
+    // SS: low (active)
+    PORTB &= ~(1 << PB2);      
+    
+    // Register Address transfer
+    SPDR = registerAddress;
+    while (!(SPSR & (1 << SPIF)));    
+    // Data transfer
+    SPDR = data;
+    while (!(SPSR & (1 << SPIF)));
+    response = SPDR;
+    
+    // SS: high (inactive)
+    PORTB |= (1 << PB2);  
+    return response;
+}
+
+void setup_scale(uint8_t scale_a, uint8_t scale_g) {
+  uint8_t current_config_accel = transfer_SPI(ACCEL_CONFIG, 0x00, true);
+  uint8_t current_config_gyro = transfer_SPI(GYRO_CONFIG, 0x00, true);
+  
+  current_config_accel &= ~0x18; // Set 00 to ACCEL_FS_SEL[1:0]
+  current_config_gyro &= ~0x18;
+
+  current_config_accel |= (scale_a << 3); // Set ACCEL_FS_SEL to scale
+  current_config_gyro |= (scale_g << 3); // Set ACCEL_FS_SEL to scale
+
+
+  transfer_SPI(ACCEL_CONFIG, current_config_accel, false); // Write accel config
+
+  // Set resolution
+  switch (scale_a) {
+    case 0x00: // +- 2g
+      accel_scale = 2.0f / 32768.0f;
+      break;
+    case 0x01: // +- 4g
+      accel_scale = 4.0f / 32768.0f;
+      break;
+    case 0x02: // +- 8g
+      accel_scale = 8.0f / 32768.0f;
+      break;
+    case 0x03: // +- 16g
+      accel_scale = 16.0f / 32768.0f;
+      break;
+  }
+
+  accel_scale = accel_scale * 9.80665f; //g to m/s^2
+
+  transfer_SPI(GYRO_CONFIG, current_config_gyro, false); // Write accel config
+
+    // Set resolution
+  switch (scale_g) {
+    case 0x00: // +- 250 deg
+      gyro_scale = 250.0f / 32768.0f;
+      break;
+    case 0x01: // +- 500 deg
+      gyro_scale = 500.0f / 32768.0f;
+      break;
+    case 0x02: // +- 1000 deg
+      gyro_scale = 1000.0f / 32768.0f;
+      break;
+    case 0x03: // +- 16g
+      gyro_scale = 2000.0f / 32768.0f;
+      break;
+  }
+
+}
+
 void read_AccelData() {
   rawData_accel[0] = transfer_SPI(ACCEL_XOUT_H, 0x00, true);
   rawData_accel[1] = transfer_SPI(ACCEL_XOUT_L, 0x00, true);
@@ -125,6 +197,12 @@ void calculateDirection() {
   angle_y += gyro_y * mpu_dt;
   angle_z += gyro_z * mpu_dt;
   
+}
+
+void filter_temp(){
+  filter_x=accel_x;
+  filter_y=accel_y;
+  filter_z=accel_z;
 }
 
 void lowpass_filter() {
