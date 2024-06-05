@@ -28,6 +28,7 @@ unsigned long currentMillis;
 uint8_t acc_full_scale = 0x01; // Set accel scale (+-2g: 0x00, +-4g: 0x01, +-8g: 0x02, +- 16g: 0x03)
 uint8_t gyro_full_scale = 0x02; // Set gyro scale (00 = +250dps, 01= +500 dps, 10 = +1000 dps, 11 = +2000 dps )
 int crash = 40;
+int flip = 20000;
 float   accel_scale, gyro_scale;
 float   accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z;
 const float mpu_dt = 0.01; //time vary 10ms
@@ -174,9 +175,14 @@ void read_GyroData() {
   gyroCount[1] = (rawData_gyro[2] << 8) | rawData_gyro[3];
   gyroCount[2] = (rawData_gyro[4] << 8) | rawData_gyro[5];
 
-  gyro_x = gyroCount[0] * gyro_scale;
-  gyro_y = gyroCount[1] * gyro_scale;
-  gyro_z = gyroCount[2] * gyro_scale;
+  gyro_x = gyroCount[0] * gyro_scale + 3.94;
+  gyro_y = gyroCount[1] * gyro_scale + 0.1;
+  gyro_z = gyroCount[2] * gyro_scale + 0.5;
+
+  if (gyro_x*gyro_x + gyro_y*gyro_y > flip){
+    relay_channel_on();
+    infinite_loop();
+  }
 }
 
 void calculateDisplacement() {
@@ -264,6 +270,8 @@ void loop(){
     
   //Serial.print("velocity_x = "); Serial.print(velocity_x); Serial.print(", velocity_y = "); Serial.print(velocity_y); Serial.print(", velocity_z = "); Serial.println(velocity_z);
   //Serial.print("displacement_x = "); Serial.print(displacement_x); Serial.print(", displacement_y = "); Serial.print(displacement_y); Serial.print(", displacement_z = "); Serial.println(displacement_z);
+  
+  //Serial.print("gyro_x = "); Serial.print(gyro_x); Serial.print(", gyro_y = "); Serial.print(gyro_y); Serial.print(", gyro_z = "); Serial.println(gyro_z);
   //Serial.print("angle_x = "); Serial.print(angle_x); Serial.print(", angle_y = "); Serial.print(angle_y); Serial.print(", angle_z = "); Serial.println(angle_z);
   currentMillis=millis();
 
