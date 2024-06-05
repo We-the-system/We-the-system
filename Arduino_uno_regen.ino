@@ -27,7 +27,7 @@ unsigned long currentMillis;
 
 uint8_t acc_full_scale = 0x01; // Set accel scale (+-2g: 0x00, +-4g: 0x01, +-8g: 0x02, +- 16g: 0x03)
 uint8_t gyro_full_scale = 0x02; // Set gyro scale (00 = +250dps, 01= +500 dps, 10 = +1000 dps, 11 = +2000 dps )
-int crash = 1000;
+int crash = 80;
 float   accel_scale, gyro_scale;
 float   accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z;
 const float mpu_dt = 0.01; //time vary 10ms
@@ -151,11 +151,11 @@ void read_AccelData() {
   accelCount[1] = (rawData_accel[2] << 8) | rawData_accel[3];
   accelCount[2] = (rawData_accel[4] << 8) | rawData_accel[5];
 
-  accel_x = accelCount[0] * accel_scale;
-  accel_y = accelCount[1] * accel_scale;
-  accel_z = accelCount[2] * accel_scale;
+  accel_x = accelCount[0] * accel_scale -0.18;
+  accel_y = accelCount[1] * accel_scale -0.52;
+  accel_z = accelCount[2] * accel_scale ;
 
-  if (accel_x*accel_x +accel_y*accel_y + accel_z*accel_z > crash){
+  if (accel_x*accel_x +accel_y*accel_y > crash){
     relay_channel_on();
     infinite_loop();
   }
@@ -181,9 +181,9 @@ void read_GyroData() {
 
 void calculateDisplacement() {
   // 속도 적분
-  velocity_x += accel_x * mpu_dt;
-  velocity_y += accel_y * mpu_dt;
-  velocity_z += accel_z * mpu_dt;
+  velocity_x += filter_x * mpu_dt;
+  velocity_y += filter_y * mpu_dt;
+  velocity_z += filter_z * mpu_dt;
 
 
   // 변위 적분
@@ -205,14 +205,12 @@ void filter_temp(){
   filter_z=accel_z;
 }
 
-void lowpass_filter() {
+void filter(){
   float alpha = 0.7;
   filter_x = alpha * accel_x + (1 - alpha) * filter_x;
   filter_y = alpha * accel_y + (1 - alpha) * filter_y;
   filter_z = alpha * accel_z + (1 - alpha) * filter_z;
-}
 
-void thresholding_filter(){
   if (filter_x < 0.15)
     filter_x = 0;
   if (filter_y < 0.15)
@@ -255,21 +253,24 @@ void loop(){
   read_GyroData();
 
   filter_temp();
-  thresholding_filter();
-  lowpass_filter();
+  filter();
+  
 
   calculateDisplacement();
+  calculateDirection();
   
   //Serial.print("accel_x = "); Serial.print(accel_x); Serial.print(", accel_y = "); Serial.print(accel_y); Serial.print(", accel_z = "); Serial.println(accel_z);
   Serial.print("filter_x = "); Serial.print(filter_x); Serial.print(", filter_y = "); Serial.print(filter_y); Serial.print(", filter_z = "); Serial.println(filter_z);
     
   //Serial.print("velocity_x = "); Serial.print(velocity_x); Serial.print(", velocity_y = "); Serial.print(velocity_y); Serial.print(", velocity_z = "); Serial.println(velocity_z);
-  Serial.print("displacement_x = "); Serial.print(displacement_x); Serial.print(", displacement_y = "); Serial.print(displacement_y); Serial.print(", displacement_z = "); Serial.println(displacement_z);
-  
-  if (currentMillis - startMillis >= 5000 && currentMillis - startMillis < 8000)
-    relay_channel_on();
+  //Serial.print("displacement_x = "); Serial.print(displacement_x); Serial.print(", displacement_y = "); Serial.print(displacement_y); Serial.print(", displacement_z = "); Serial.println(displacement_z);
+  //Serial.print("angle_x = "); Serial.print(angle_x); Serial.print(", angle_y = "); Serial.print(angle_y); Serial.print(", angle_z = "); Serial.println(angle_z);
+  currentMillis=millis();
 
-  if (currentMillis - startMillis >= 8000)
+  if (currentMillis - startMillis >= 5000 && currentMillis - startMillis < 8000){
+    relay_channel_on();
+  } else if (currentMillis - startMillis >= 8000){
     relay_channel_off();
     startMillis = millis();
+  }
 }
