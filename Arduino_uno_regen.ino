@@ -27,7 +27,7 @@ unsigned long currentMillis;
 
 uint8_t acc_full_scale = 0x01; // Set accel scale (+-2g: 0x00, +-4g: 0x01, +-8g: 0x02, +- 16g: 0x03)
 uint8_t gyro_full_scale = 0x02; // Set gyro scale (00 = +250dps, 01= +500 dps, 10 = +1000 dps, 11 = +2000 dps )
-int crash = 80;
+int crash = 40;
 float   accel_scale, gyro_scale;
 float   accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z;
 const float mpu_dt = 0.01; //time vary 10ms
