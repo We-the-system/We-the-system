@@ -254,13 +254,14 @@ void loop(){
   read_AccelData();
   read_GyroData();
 
-  //filter_temp();
-  lowpass_filter();
+  filter_temp();
   thresholding_filter();
+  lowpass_filter();
+
   calculateDisplacement();
   
   //Serial.print("accel_x = "); Serial.print(accel_x); Serial.print(", accel_y = "); Serial.print(accel_y); Serial.print(", accel_z = "); Serial.println(accel_z);
-  //Serial.print("filter_x = "); Serial.print(filter_x); Serial.print(", filter_y = "); Serial.print(filter_y); Serial.print(", filter_z = "); Serial.println(filter_z);
+  Serial.print("filter_x = "); Serial.print(filter_x); Serial.print(", filter_y = "); Serial.print(filter_y); Serial.print(", filter_z = "); Serial.println(filter_z);
     
   //Serial.print("velocity_x = "); Serial.print(velocity_x); Serial.print(", velocity_y = "); Serial.print(velocity_y); Serial.print(", velocity_z = "); Serial.println(velocity_z);
   Serial.print("displacement_x = "); Serial.print(displacement_x); Serial.print(", displacement_y = "); Serial.print(displacement_y); Serial.print(", displacement_z = "); Serial.println(displacement_z);
