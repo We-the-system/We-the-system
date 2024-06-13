@@ -226,6 +226,7 @@ void filter(){
 }
 
 void infinite_loop() {
+  //when crash or flip occurs
   while (true) {
     Serial.println("Entering infinite loop...");
     delay(1000);
@@ -237,8 +238,8 @@ void setup(){
 
   DDRB |=  (1 << NCS) | (1 << SDA) | (1 << SCL);
   DDRB &= ~(1 << ADD); //NCS DISABLE for SPI communication
-  SPCR |=   (1 << SPE)  | (1 << MSTR) | (1 << SPR0);
-  SPCR &= ~((1 << DORD) | (1 << CPOL) | (1 << CPHA) | (1 << SPR1));
+  SPCR |=   (1 << SPE)  | (1 << MSTR) | (1 << SPR0); //SPR[1:0] prescaler 16 1mhz
+  SPCR &= ~((1 << DORD) | (1 << CPOL) | (1 << CPHA) | (1 << SPR1)); //CPOL, CPHA 1,1 > SPI Mode0, gives data at falling edge
   PORTB |= (1 << NCS); 
   setup_scale(acc_full_scale, gyro_full_scale);
   //disable i2c
