@@ -44,7 +44,7 @@ float angle_z = 0.0;
 char    accel_x_str[10], accel_y_str[10], accel_z_str[10], gyro_x_str[10], gyro_y_str[10], gyro_z_str[10];
 uint8_t rawData_accel[6], rawData_gyro[6];
 int16_t accelCount[3], gyroCount[3];
-char    message[255] = {0,};
+//char    message[255] = {0,}; //bluetooth
 
 float filter_x=0;
 float filter_y=0;
@@ -74,7 +74,7 @@ uint8_t transfer_SPI(uint8_t registerAddress, uint8_t data, bool isRead) {
     registerAddress |= (isRead ? 0x80 : 0x00);    
     
     // SS: low (active)
-    PORTB &= ~(1 << PB2);      
+    PORTB &= ~(1 << NCS);      
     
     // Register Address transfer
     SPDR = registerAddress;
@@ -236,11 +236,11 @@ void infinite_loop() {
 void setup(){
   Serial.begin(9600);
 
-  DDRB |=  (1 << NCS) | (1 << SDA) | (1 << SCL);
+  DDRB |=  (1 << NCS) | (1 << SDA) | (1 << SCL); //pin number above when defiend
   DDRB &= ~(1 << ADD); //NCS DISABLE for SPI communication
-  SPCR |=   (1 << SPE)  | (1 << MSTR) | (1 << SPR0); //SPR[1:0] prescaler 16 1mhz
-  SPCR &= ~((1 << DORD) | (1 << CPOL) | (1 << CPHA) | (1 << SPR1)); //CPOL, CPHA 1,1 > SPI Mode0, gives data at falling edge
-  PORTB |= (1 << NCS); 
+  SPCR |=   (1 << SPE)  | (1 << MSTR) | (1 << SPR0); //enable spi, master, SPR[1:0] prescaler 16 1mhz
+  SPCR &= ~((1 << DORD) | (1 << CPOL) | (1 << CPHA) | (1 << SPR1)); //DORD 0 MSB first, CPOL, CPHA 1,1 > SPI Mode0, gives data at falling edge
+  PORTB |= (1 << NCS);
   setup_scale(acc_full_scale, gyro_full_scale);
   //disable i2c
   uint8_t current_setting = transfer_SPI(USER_CTRL, 0x00, true); // Read USER_CTRL
